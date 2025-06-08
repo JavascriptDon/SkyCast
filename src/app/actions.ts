@@ -1,78 +1,86 @@
 'use server';
 
 import type { WeatherData, WeatherError, WeatherResponse } from '@/lib/types';
+import cityList from './city.list.json';
 
 // Mock API call - in a real app, this would fetch from OpenWeatherMap
 export async function getWeather(
-  prevState: WeatherResponse | null,
+  // biome-ignore lint/correctness/noUnusedVariables: parameter reserved for framework integration
+  _prevState: WeatherResponse | null,
   formData: FormData
 ): Promise<WeatherResponse> {
-  const city = formData.get('city') as string;
+  const cityEntry = formData.get("city");
 
-  if (!city || city.trim() === "") {
+  if (typeof cityEntry !== "string" || cityEntry.trim() === "") {
     return { error: "Please enter a city name." };
   }
 
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  const city = cityEntry.trim();
+  const openWeatherMapApiKey = process.env.OPENWEATHERMAP_API_KEY;
 
-  const cityLower = city.toLowerCase();
-
-  if (cityLower === 'error') {
-    return { error: 'Could not retrieve weather data. Please try again later.', city };
+  if (!openWeatherMapApiKey) {
+    console.error("OPENWEATHERMAP_API_KEY is not set in environment variables.");
+    return { error: "Server configuration error: API key missing.", city };
   }
 
-  if (cityLower === 'notfound' || cityLower === 'xyz' || cityLower === "nonexistentcity") {
+  // Ensure cityList is available
+  if (typeof cityList === "undefined") {
+    return { error: "Internal error: city list is not available.", city };
+  }
+
+  const foundCity = cityList.find(c => c.name.toLowerCase() === city.toLowerCase());
+  if (!foundCity) {
     return { error: `City "${city}" not found. Please check the spelling.`, city };
   }
 
-  // Mock data for successful responses
-  const mockWeatherData: { [key: string]: WeatherData } = {
-    london: {
-      city: 'London',
-      temperature: 15.2,
-      humidity: 72,
-      windSpeed: 5.1,
-      description: 'scattered clouds',
-      iconName: 'Clouds',
-    },
-    paris: {
-      city: 'Paris',
-      temperature: 18.5,
-      humidity: 65,
-      windSpeed: 3.5,
-      description: 'clear sky',
-      iconName: 'Clear',
-    },
-    tokyo: {
-      city: 'Tokyo',
-      temperature: 22.0,
-      humidity: 80,
-      windSpeed: 2.0,
-      description: 'light rain',
-      iconName: 'Rain',
-    },
-    newyork: {
-        city: 'New York',
-        temperature: 25.0,
-        humidity: 60,
-        windSpeed: 7.0,
-        description: 'few clouds',
-        iconName: 'Clouds',
+  const cityId = foundCity.id;
+  const apiUrl = `https://api.openweathermap.org/data/2.5/forecast?id=${cityId}&appid=${openWeatherMapApiKey}&units=metric`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+    const response = await fetch(apiUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`OpenWeatherMap API error: ${response.status} ${response.statusText}`, errorBody);
+      return { error: `Could not retrieve weather data: ${response.statusText}`, city };
     }
-  };
 
-  if (mockWeatherData[cityLower.replace(/\s+/g, '')]) {
-    return mockWeatherData[cityLower.replace(/\s+/g, '')];
+    const data = await response.json();
+
+    if (!Array.isArray(data.list) || data.list.length === 0) {
+      return { error: "Weather data is missing or malformed.", city };
+    }
+
+    const forecast = data.list[0];
+
+    if (
+      !forecast.main ||
+      !forecast.weather ||
+      !Array.isArray(forecast.weather) ||
+      forecast.weather.length === 0 ||
+      !forecast.wind
+    ) {
+      return { error: "Incomplete weather information received.", city };
+    }
+
+    return {
+      city: foundCity.name,
+      temperature: forecast.main.temp,
+      humidity: forecast.main.humidity,
+      windSpeed: forecast.wind.speed,
+      description: forecast.weather[0].description,
+      iconName: forecast.weather[0].main,
+    };
+  } catch (error) {
+    if ((error as Error).name === "AbortError") {
+      return { error: "Weather data request timed out.", city };
+    }
+
+    console.error("Error fetching weather data:", error);
+    return { error: "An error occurred while fetching weather data.", city };
   }
-
-  // Generic mock for other cities
-  return {
-    city: city.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '), // Capitalize city name
-    temperature: Math.random() * 30 + 5, // Random temp between 5 and 35
-    humidity: Math.floor(Math.random() * 70) + 30, // Random humidity 30-100
-    windSpeed: Math.random() * 10, // Random wind speed 0-10
-    description: ['clear sky', 'few clouds', 'scattered clouds', 'broken clouds', 'rain', 'snow', 'mist'][Math.floor(Math.random() * 7)],
-    iconName: ['Clear', 'Clouds', 'Rain', 'Snow', 'Mist'][Math.floor(Math.random() * 5)],
-  };
 }
