@@ -54,3 +54,6 @@ Generate a basic structure for a weather app using the OpenWeatherMap API.
 📚 Documentation
 
 Firebase Documentation: [Effective Prompt](https://firebase.google.com/docs/studio/prompting?_gl=1*1x2p5c5*_up*MQ..*_ga*MTEzMDQ1MTcyOC4xNzQ0NDQ4MDMz*_ga_CW55HF8NVT*MTc0NDQ0ODAzMy4xLjAuMTc0NDQ0ODAzMy4wLjAuMA)
+
+https://github.com/user-attachments/assets/71ae708b-5ab2-4f32-a132-af13ae8d2bb3
+
