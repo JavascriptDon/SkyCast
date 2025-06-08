@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -13,7 +14,7 @@ import { WeatherDisplay } from '@/components/weather-display';
 
 export default function HomePage() {
   const initialState: WeatherResponse | null = null;
-  const [formState, formAction] = useFormState(getWeather, initialState);
+  const [formState, formAction] = useActionState(getWeather, initialState);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 md:p-8 bg-background">
@@ -66,3 +67,4 @@ export default function HomePage() {
     </main>
   );
 }
+
